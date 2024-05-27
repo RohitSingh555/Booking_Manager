@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-import fitz  # PyMuPDF
 import pdfplumber  # New library for better PDF parsing
 import re
 import logging

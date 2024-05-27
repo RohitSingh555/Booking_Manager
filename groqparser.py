@@ -1,68 +1,72 @@
 import openpyxl
 import json
-from groq import Groq
 import os
+import time
 from dotenv import load_dotenv
-import requests
-import re
+from groq import Groq
 
 # Load environment variables
 load_dotenv()
 api_key = os.getenv("GROQ_API_KEY")
 
 # Categories
-categories = {
+categories = [
     "Income",
     "Expenses",
     "Business Expenses",
     "Tax Deductible Expenses",
     "Subscriptions",
-    "Uncertain Expenses"
-}
+    "Uncertain Expenses",
+]
 
 def read_excel_file(file_path):
     wb = openpyxl.load_workbook(file_path)
-    sheet = wb.active
+    sheets_data = {}
 
-    max_row = sheet.max_row
-    max_column = sheet.max_column
+    for sheet in wb.worksheets:
+        max_row = sheet.max_row
+        max_column = sheet.max_column
 
-    date_column = None
-    description_column = None
-    amount_column = None
+        date_column = None
+        description_column = None
+        amount_column = None
 
-    for col_idx in range(1, max_column + 1):
-        cell_value = sheet.cell(row=1, column=col_idx).value
-        if cell_value and any(keyword in cell_value.lower() for keyword in ["date", "total"]):
-            date_column = col_idx
-        elif cell_value and "description" in cell_value.lower():
-            description_column = col_idx
-        elif cell_value and "amount" in cell_value.lower():
-            amount_column = col_idx
+        for col_idx in range(1, max_column + 1):
+            cell_value = sheet.cell(row=1, column=col_idx).value
+            if cell_value:
+                cell_value_lower = cell_value.lower()
+                if any(keyword in cell_value_lower for keyword in ["date", "total"]):
+                    date_column = col_idx
+                elif "description" in cell_value_lower:
+                    description_column = col_idx
+                elif "amount" in cell_value_lower:
+                    amount_column = col_idx
 
-    # Check if all required columns are found
-    if date_column is None or description_column is None or amount_column is None:
-        raise ValueError("Required columns not found in the Excel file.")
+        # Skip the sheet if all required columns are not found
+        if date_column is None or description_column is None or amount_column is None:
+            print(f"Skipping sheet {sheet.title}: required columns not found.")
+            continue
 
-    # Extract data from the identified columns
-    data = []
-    for row_idx in range(2, max_row + 1):
-        entry = {
-            "date": sheet.cell(row=row_idx, column=date_column).value,
-            "description": sheet.cell(row=row_idx, column=description_column).value,
-            "amount": sheet.cell(row=row_idx, column=amount_column).value
-        }
-        data.append(entry)
+        # Extract data from the identified columns
+        data = []
+        for row_idx in range(2, max_row + 1):
+            entry = {
+                "date": sheet.cell(row=row_idx, column=date_column).value,
+                "description": sheet.cell(row=row_idx, column=description_column).value,
+                "amount": sheet.cell(row=row_idx, column=amount_column).value
+            }
+            data.append(entry)
+        
+        sheets_data[sheet.title] = data
 
-    return data
+    return sheets_data
 
-# Function to create or update an Excel file from response data
 def create_excel_file(response_data, categories, file_name):
     try:
         wb = openpyxl.load_workbook(file_name)
     except FileNotFoundError:
         wb = openpyxl.Workbook()
-        wb.remove(wb.active)  
+        wb.remove(wb.active)
 
     sheets = {}
     for category in categories:
@@ -70,25 +74,40 @@ def create_excel_file(response_data, categories, file_name):
             sheets[category] = wb[category]
         else:
             sheets[category] = wb.create_sheet(title=category)
-            sheets[category].append(["Date", "Amount", "Description", "Transaction Type"])
+            sheets[category].append(["Date", "Amount", "Description", "Source"])
 
     for entry in response_data:
-        category = entry["category"]
+        # Normalize keys to lowercase
+        normalized_entry = {k.lower(): v for k, v in entry.items()}
+        category = normalized_entry.get("category")
         if category in sheets:
-            sheets[category].append([entry["date"], entry["amount"], entry["description"], entry["transaction_type"]])
+            sheets[category].append([normalized_entry.get("date"), normalized_entry.get("amount"), normalized_entry.get("description"), normalized_entry.get("source")])
 
     wb.save(file_name)
 
 def get_groq_response(categorized_data):
-    client = Groq(
-        api_key=os.environ.get("GROQ_API_KEY")
-    )
+    client = Groq(api_key=api_key)
+
+    # Calculate the context length of the messages
+    prompt_message = f"Please note: I don't want code! {json.dumps(categorized_data)} \n Take this data and give me a json which has Date, Amount(only keep integers in the amount), Description, Source (Upwork, Employer, Bank, Food, Housing, Utilities, Food, Supplies, Travel, Business Expense) and category (give the category from these 6 'Income, Expenses, Business Expenses, Uncertain Expenses, Tax Deductible Expenses, Subscriptions') analyze the data and description to give me a source of the transactions and category don't provide null, and always return json for the whole data don't skip anything. And even if all the transactions are expenses keep categorizing them."
+    context_length = len(prompt_message)
+    print(f"Context length: {context_length}")
+
+    # Define a limit for the context length (e.g., 6000 tokens, which is a common limit)
+    context_limit = 6000
+
+    # Truncate the prompt if it exceeds the limit
+    if context_length > context_limit:
+        print(f"Truncating context from {context_length} to {context_limit}")
+        truncated_message = prompt_message[:context_limit]
+    else:
+        truncated_message = prompt_message
 
     chat_completion = client.chat.completions.create(
         messages=[
             {
                 "role": "user",
-                "content": f"Please note: I don't want code! {categorized_data} \n Take this data and give me a json which has Date , Amount, Description, transaction type (credit or debit) and category(give the category from these 4 'Income, Expenses, Business Expenses and Uncertain Expenses') analyze the data and description to give me transaction_type and category don't provide null, and always return json for the whole data don't skip anything..",
+                "content": truncated_message,
             }
         ],
         model="llama3-70b-8192",
@@ -121,24 +140,44 @@ def extract_json_from_string(string):
 
     return json_objects
 
-# Main function
+def process_sheet(sheet_data, categories, file_name):
+    batch_size = 12  # Number of rows to process in each batch
+    for i in range(0, len(sheet_data), batch_size):
+        batch = sheet_data[i:i + batch_size]
+        response = get_groq_response(batch)
+
+        try:
+            json_objects = extract_json_from_string(response)
+            if not json_objects:
+                raise ValueError("No valid JSON objects found in the response.")
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON from response: {e}")
+            continue
+
+        print("Extracted JSON objects:", json_objects)
+        create_excel_file(json_objects, categories, file_name)
+        
+        # Add delay between API requests
+        time.sleep(2)
+
 def main():
-    file_path = "processed_files/test.xlsx"
-    data = read_excel_file(file_path)
-
-    response = get_groq_response(data)
-
-    try:
-        json_objects = extract_json_from_string(response)
-        if not json_objects:
-            raise ValueError("No valid JSON objects found in the response.")
-    except json.JSONDecodeError as e:
-        print(f"Error parsing JSON from response: {e}")
+    directory_path = "processed_files"
+    output_excel = "categorized_data.xlsx"
+    
+    if not os.path.exists(directory_path):
+        print(f"Directory {directory_path} does not exist. Please check the path.")
         return
 
-    print("Extracted JSON objects:", json_objects)
+    # Process all .xlsx files in the directory
+    for file_name in os.listdir(directory_path):
+        if file_name.endswith(".xlsx"):
+            file_path = os.path.join(directory_path, file_name)
+            print(f"Processing file: {file_path}")
+            sheets_data = read_excel_file(file_path)
 
-    create_excel_file(json_objects, categories, "categorized_data.xlsx")
+            for sheet_name, sheet_data in sheets_data.items():
+                print(f"Processing sheet: {sheet_name} in file: {file_name}")
+                process_sheet(sheet_data, categories, output_excel)
 
 if __name__ == "__main__":
     main()
