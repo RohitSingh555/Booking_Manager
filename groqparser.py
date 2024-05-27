@@ -91,7 +91,7 @@ def get_groq_response(categorized_data):
                 "content": f"Please note: I don't want code! {categorized_data} \n Take this data and give me a json which has Date , Amount, Description, transaction type (credit or debit) and category(give the category from these 4 'Income, Expenses, Business Expenses and Uncertain Expenses') analyze the data and description to give me transaction_type and category don't provide null, and always return json for the whole data don't skip anything..",
             }
         ],
-        model="llama3-8b-8192",
+        model="llama3-70b-8192",
     )
 
     response = chat_completion.choices[0].message.content
