@@ -15,36 +15,44 @@ def parse_files_in_folder(folder_path, output_excel_path):
     # Create a Pandas Excel writer using openpyxl as the engine.
     writer = pd.ExcelWriter(output_excel_path, engine='openpyxl')
 
-    # Loop through all files in the folder
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
-        
-        # Check if the file is a PDF, TXT, or CSV
-        if filename.endswith('.pdf'):
-            # Parse PDF
-            data = parse_pdf(file_path)
-        elif filename.endswith('.txt'):
-            # Parse TXT
-            data = parse_txt(file_path)
-        elif filename.endswith('.csv'):
-            # Read CSV
-            data = pd.read_csv(file_path)
-        else:
-            # Skip if not a supported file type
-            continue
+    try:
+        # Loop through all files in the folder
+        for filename in os.listdir(folder_path):
+            if filename.endswith('-read'):  # Skip files ending with '-read'
+                continue
+            file_path = os.path.join(folder_path, filename)
+            
+            # Check if the file is a PDF, TXT, or CSV
+            if filename.endswith('.pdf'):
+                # Parse PDF
+                data = parse_pdf(file_path)
+            elif filename.endswith('.txt'):
+                # Parse TXT
+                data = parse_txt(file_path)
+            elif filename.endswith('.csv'):
+                # Read CSV
+                data = pd.read_csv(file_path)
+            else:
+                # Skip if not a supported file type
+                continue
 
-        if data.empty:
-            logging.warning(f"No data extracted from file: {filename}")
-            continue
+            if data.empty:
+                logging.warning(f"No data extracted from file: {filename}")
+                continue
 
-        data['Category'] = 'Category_Value'
+            data['Category'] = 'Category_Value'
 
-        # Write to Excel with sheet name as filename
-        sheet_name = os.path.splitext(filename)[0][:31]  # Use filename without extension as sheet name, limit to 31 chars
-        data.to_excel(writer, sheet_name=sheet_name, index=False)
+            # Write to Excel with sheet name as filename
+            sheet_name = os.path.splitext(filename)[0][:31]  # Use filename without extension as sheet name, limit to 31 chars
+            data.to_excel(writer, sheet_name=sheet_name, index=False)
+            
+            os.rename(file_path, os.path.join(folder_path, filename + '-read'))
 
-    # Save the Excel file
-    writer._save()
+        # Save the Excel file
+        writer._save()
+    except Exception as e:
+        logging.error(f"An error occurred while processing files, All the files seems to have been read before: {e}")
+
 
 def parse_pdf(file_path):
     rows = []
@@ -99,5 +107,5 @@ def parse_txt(file_path):
 
 # Example usage
 folder_path = 'client_docs'  # Use relative path
-output_excel_path = 'processed_files/test.xlsx'  # Use relative path
+output_excel_path = 'processed_files/csv_extracted.xlsx'  # Use relative path
 parse_files_in_folder(folder_path, output_excel_path)

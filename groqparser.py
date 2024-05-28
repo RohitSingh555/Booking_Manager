@@ -162,7 +162,7 @@ def process_sheet(sheet_data, categories, file_name):
 
 def main():
     directory_path = "processed_files"
-    output_excel = "categorized_data.xlsx"
+    output_excel = "/ollama/categorized_data.xlsx"
     
     if not os.path.exists(directory_path):
         print(f"Directory {directory_path} does not exist. Please check the path.")

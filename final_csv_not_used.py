@@ -66,7 +66,7 @@ def write_to_excel(parsed_data, output_file):
     workbook.save(output_file)
 
 if __name__ == "__main__":
-    input_file = "processed_files/test.xlsx"
+    input_file = "processed_files/categorized_data.xlsx"
     output_file = "parsed_files/parsed_data.xlsx"
     parsed_data = parse_excel(input_file)
     if parsed_data is not None:

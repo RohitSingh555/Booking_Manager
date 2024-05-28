@@ -107,7 +107,7 @@ def remove_duplicate_rows(sheet):
         sheet.append(row)
 
 def identify_and_process_pdfs(directory, output_excel):
-    pdf_files = [f for f in os.listdir(directory) if f.endswith('.pdf')]
+    pdf_files = [f for f in os.listdir(directory) if f.endswith('.pdf') and not f.endswith('-read.pdf')]
     logging.info("Found %d PDF files in the directory.", len(pdf_files))
     
     for filename in pdf_files:
@@ -123,12 +123,16 @@ def identify_and_process_pdfs(directory, output_excel):
         else:
             logging.info("Processing PayPal PDF: %s", filename)
             data = extract_data_from_paypal(pdf_path)
-            if filename.lower() == "creed.pdf":
-                print("Extracted data from creed.pdf:")
             if not data:
                 logging.warning("No data extracted from PayPal PDF: %s", filename)
             else:
                 save_to_excel(data, output_excel, "PayPal")
+        
+        # Rename the processed file
+        new_filename = f"{os.path.splitext(filename)[0]}-read.pdf"
+        new_pdf_path = os.path.join(directory, new_filename)
+        os.rename(pdf_path, new_pdf_path)
+        logging.info("Renamed processed file to: %s", new_pdf_path)
 
 def main():
     directory_path = "client_docs"
