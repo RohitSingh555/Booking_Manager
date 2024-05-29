@@ -42,7 +42,7 @@ def chatbot(collection_name):
         if document:
             print("Chatbot: Here is the information I found:")
             modelquery = f"{user_input} - Answer that question using the following text as a resource and make sure that you always respond in the most human way possible. refrain from giving table like information or json structures, always provide sentences paragraphs and summaries using the resource. Form intelligent sentences giving an impression that you're it's Accountant. \n: {document}"
-            stream = ollama.generate(model='gemma:2b', prompt=modelquery, stream=True)
+            stream = ollama.generate(model='llama3', prompt=modelquery, stream=True)
             for chunk in stream:
                 if chunk["response"]:
                     print(chunk['response'], end='', flush=True)
