@@ -134,7 +134,6 @@ __pycache__
 # Spyder project settings
 .spyderproject
 .spyproject
-
 # Rope project settings
 .ropeproject
 
@@ -161,3 +160,4 @@ vectordb-stores
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+ai_pdf_extractor.py

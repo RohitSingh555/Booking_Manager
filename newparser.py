@@ -8,20 +8,20 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 def parse_files_in_folder(folder_path, output_excel_path):
-    # Ensure the output directory exists
-    output_dir = os.path.dirname(output_excel_path)
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Create a Pandas Excel writer using openpyxl as the engine.
-    writer = pd.ExcelWriter(output_excel_path, engine='openpyxl')
-
     try:
+        # Ensure the output directory exists
+        output_dir = os.path.dirname(output_excel_path)
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Create a Pandas Excel writer using openpyxl as the engine.
+        writer = pd.ExcelWriter(output_excel_path, engine='openpyxl')
+
         # Loop through all files in the folder
         for filename in os.listdir(folder_path):
             if filename.endswith('-read'):  # Skip files ending with '-read'
                 continue
             file_path = os.path.join(folder_path, filename)
-            
+
             # Check if the file is a PDF, TXT, or CSV
             if filename.endswith('.pdf'):
                 # Parse PDF
@@ -45,14 +45,15 @@ def parse_files_in_folder(folder_path, output_excel_path):
             # Write to Excel with sheet name as filename
             sheet_name = os.path.splitext(filename)[0][:31]  # Use filename without extension as sheet name, limit to 31 chars
             data.to_excel(writer, sheet_name=sheet_name, index=False)
-            
-            os.rename(file_path, os.path.join(folder_path, filename + '-read'))
+
+            # Rename the processed file with '-read' suffix before the extension
+            new_filename = f"{os.path.splitext(filename)[0]}-read{os.path.splitext(filename)[1]}"
+            os.rename(file_path, os.path.join(folder_path, new_filename))
 
         # Save the Excel file
         writer._save()
     except Exception as e:
-        logging.error(f"An error occurred while processing files, All the files seems to have been read before: {e}")
-
+        logging.error(f"An error occurred while processing files: {e}")
 
 def parse_pdf(file_path):
     rows = []
@@ -61,7 +62,7 @@ def parse_pdf(file_path):
             text = page.extract_text()
             if text:
                 rows.extend(parse_pdf_text(text))
-    
+
     if rows:
         data = pd.DataFrame(rows, columns=['Date', 'Description', 'Currency', 'Amount', 'Fees', 'Total'])
     else:
@@ -93,7 +94,7 @@ def parse_txt(file_path):
     # Read the TXT file
     with open(file_path, 'r') as file:
         lines = file.readlines()
-    
+
     rows = []
     for line in lines:
         if line.strip():
