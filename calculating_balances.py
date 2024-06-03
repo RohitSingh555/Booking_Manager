@@ -160,7 +160,7 @@ def write_to_excel(file_path, weekly_balances, balance_summary, account_balances
         print(f"Error saving workbook: {e}")
 
 def main():
-    file_path = "ollama/categorized_data.xlsx"
+    file_path = "ollamaa/categorized_data.xlsx"
     sheets_to_read = ["Income", "Expenses", "Business Expenses", "Tax Deductible Expenses", "Subscriptions", "Uncertain Expenses"]
     
     data = read_excel_file(file_path, sheets_to_read)

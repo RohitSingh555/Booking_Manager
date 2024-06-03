@@ -1,10 +1,13 @@
-import os
+# main.py
 
-# Run newparser.py
-os.system("python newparser.py")
+import newparser
+import pdfextractor
+import groqparser
 
-# Run groqparser.py
-os.system("python pdfextractor.py")
-os.system("python groqparser.py")
+def run_all_parsers():
+    newparser.main()
+    pdfextractor.main()
+    groqparser.main()
 
-# Run calculating_balances.py
+if __name__ == "__main__":
+    run_all_parsers()

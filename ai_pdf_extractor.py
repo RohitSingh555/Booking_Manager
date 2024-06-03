@@ -9,90 +9,71 @@ import re
 # Setup basic configuration for logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Function to extract text from PDF using pdfplumber
 def extract_text_from_pdf(pdf_path):
+    """Extract text from PDF using pdfplumber."""
     try:
         with pdfplumber.open(pdf_path) as pdf:
             text = ""
             for page_number, page in enumerate(pdf.pages, start=1):
                 page_text = page.extract_text()
-                logging.info("Extracted text from page %d of PDF: %s", page_number, page_text)
+                # logging.info("Extracted text from page %d of PDF: %s", page_number, page_text)
                 text += page_text + "\n"
             return text
     except Exception as e:
         logging.error("Failed to process PDF %s: %s", pdf_path, str(e))
         return ""
 
-# Function to preprocess extracted text
 def preprocess_text(text):
+    """Preprocess extracted text to capture all relevant lines."""
     lines = text.split('\n')
-    transactions = []
-    for line in lines:
-        # Filter out lines that are not transactions
-        if re.search(r'\d{2}/\d{2}/\d{4}', line) and re.search(r'USD', line):
-            transactions.append(line)
-    return "\n".join(transactions)
+    return "\n".join(lines)
 
-# Function to process PayPal data using Ollama AI
-def process_paypal_data_with_ollama(text):
+def process_data_with_ollama(text):
+    """Process data with Ollama AI to extract transactions."""
     data = []
     try:
         prompt = (
-            "Extract and parse PayPal transactions from the following text and provide a JSON with Date, Description, Amount, "
-            "and Category fields:\nJSON should look like this:\n"
+            "Please note: I don't want code! \n Take the data given below and give me a json which has Date, Amount(only keep integers in the amount), Description, Source (Upwork, Employer, Bank, Food, Housing, Utilities, Food, Supplies, Travel, Business Expense) and category (give the category from these 6 'Income, Expenses, Business Expenses, Uncertain Expenses, Tax Deductible Expenses, Subscriptions') analyze the data and description to give me a source of the transactions and category don't provide null, and always return json for the whole data don't skip anything. And even if all the transactions are expenses keep categorizing them."
             "{\n"
             '    "Date": "MM-dd-yyyy",\n'
             '    "Description": "Product or service bought, fetch the description of it",\n'
             '    "Amount": "Amount took to buy that resource.",\n'
-            '    "Category": "Categorize if it is PayPal, for food, for what kind of product it is, categorize it"\n'
+            '    "Category": "Categorize the payments according to the description"\n'
             "}\n"
-            f"{text}"
+            f"data: {text}"
         )
+        print("Loading...")
         response = ollama.generate(
-            model='gemma:2b',
+            model='llama3',
             prompt=prompt
         )
+        print("Loading complete.")
+        logging.info("API Response: %s", response)
+
+        # Check if response contains 'response' key and is not empty
+        if 'response' not in response or not response['response']:
+            raise ValueError("Empty or invalid response from Ollama AI")
+
         parsed_data = response['response']
-        if not parsed_data:
-            raise ValueError("Empty response from Ollama AI")
+
+        # Extract JSON from response and save it to a file
+        with open('processed_files/transactions.json', 'w') as json_file:
+            json.dump(parsed_data, json_file, indent=4)
+            logging.info("JSON data saved to processed_files/transactions.json")
+
         transactions = json.loads(parsed_data)
         for transaction in transactions:
             data.append((transaction['Date'], transaction['Description'], transaction['Amount'], transaction['Category']))
+    except json.JSONDecodeError as e:
+        logging.error("JSON decoding failed: %s", str(e))
+        # logging.error("Response content: %s", response)
     except Exception as e:
-        logging.error("Failed to process PayPal data with Ollama AI: %s", str(e))
+        logging.error("Failed to process data with Ollama AI: %s", str(e))
+        # logging.error("Response content: %s", response)
     return data
 
-# Function to process eBay data using Ollama AI
-def process_ebay_data_with_ollama(text):
-    data = []
-    try:
-        prompt = (
-            "Extract and parse eBay transactions from the following text and provide a JSON with Date, Description, Amount, "
-            "and Category fields:\nJSON should look like this:\n"
-            "{\n"
-            '    "Date": "MM-dd-yyyy",\n'
-            '    "Description": "Product or service bought, fetch the description of it",\n'
-            '    "Amount": "Amount took to buy that resource.",\n'
-            '    "Category": "Categorize if it is eBay, for food, for what kind of product it is, categorize it"\n'
-            "}\n"
-            f"{text}"
-        )
-        response = ollama.generate(
-            model='gemma:2b',
-            prompt=prompt
-        )
-        parsed_data = response['response']
-        if not parsed_data:
-            raise ValueError("Empty response from Ollama AI")
-        transactions = json.loads(parsed_data)
-        for transaction in transactions:
-            data.append((transaction['Date'], transaction['Description'], transaction['Amount'], transaction['Category']))
-    except Exception as e:
-        logging.error("Failed to process eBay data with Ollama AI: %s", str(e))
-    return data
-
-# Function to save data to Excel
 def save_to_excel(data, file_name, sheet_name):
+    """Save extracted data to an Excel file."""
     try:
         if os.path.exists(file_name):
             wb = openpyxl.load_workbook(file_name)
@@ -118,6 +99,7 @@ def save_to_excel(data, file_name, sheet_name):
         logging.error("Failed to save data to Excel %s: %s", file_name, str(e))
 
 def remove_duplicate_rows(sheet):
+    """Remove duplicate rows from an Excel sheet."""
     rows = [tuple(cell.value for cell in row) for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, max_col=sheet.max_column)]
     unique_rows = set(rows)
     sheet.delete_rows(2, sheet.max_row)
@@ -125,6 +107,7 @@ def remove_duplicate_rows(sheet):
         sheet.append(row)
 
 def identify_and_process_pdfs(directory, output_excel):
+    """Identify PDF files in a directory and process them to extract transaction data."""
     pdf_files = [f for f in os.listdir(directory) if f.endswith('.pdf')]
     logging.info("Found %d PDF files in the directory.", len(pdf_files))
     
@@ -133,23 +116,13 @@ def identify_and_process_pdfs(directory, output_excel):
         logging.info("Processing PDF: %s", pdf_path)
         
         text = extract_text_from_pdf(pdf_path)
-        text = preprocess_text(text)
+        preprocessed_text = preprocess_text(text)
         
-        if "ebay" in filename.lower():
-            logging.info("Processing eBay PDF: %s", filename)
-            data = process_ebay_data_with_ollama(text)
-            save_to_excel(data, output_excel, "eBay")
-        elif filename.endswith("PDF"):
-            logging.info("Skipping PDF: %s", filename)
+        data = process_data_with_ollama(preprocessed_text)
+        if not data:
+            logging.warning("No data extracted from PDF: %s", filename)
         else:
-            logging.info("Processing PayPal PDF: %s", filename)
-            data = process_paypal_data_with_ollama(text)
-            if filename.lower() == "creed.pdf":
-                print("Extracted data from creed.pdf:")
-            if not data:
-                logging.warning("No data extracted from PayPal PDF: %s", filename)
-            else:
-                save_to_excel(data, output_excel, "PayPal")
+            save_to_excel(data, output_excel, "Transactions")
 
 def main():
     directory_path = "client_docs"

@@ -106,7 +106,11 @@ def parse_txt(file_path):
     data = pd.DataFrame(rows, columns=['Date', 'Description', 'Amount'])
     return data
 
-# Example usage
-folder_path = 'client_docs'  # Use relative path
-output_excel_path = 'processed_files/csv_extracted.xlsx'  # Use relative path
-parse_files_in_folder(folder_path, output_excel_path)
+def main():
+    # Example usage
+    folder_path = 'client_docs'  # Use relative path
+    output_excel_path = 'processed_files/csv_extracted.xlsx'  # Use relative path
+    parse_files_in_folder(folder_path, output_excel_path)
+
+if __name__ == "__main__":
+    main()

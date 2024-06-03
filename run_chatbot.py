@@ -1,7 +1,14 @@
-import os
+print("Starting main.py")
+import ollamaa.search as search
+print("Imported search")
+import ollamaa.chatbot as chatbot
+print("Imported chatbot")
 
-# Run search.py
-os.system("python ollama/search.py")
+def run_all():
+    print("Running search")
+    search.main()
+    print("Running chatbot")
+    chatbot.main()
 
-# Run chatbot.py
-os.system("python ollama/chatbot.py")
+if __name__ == "__main__":
+    run_all()
