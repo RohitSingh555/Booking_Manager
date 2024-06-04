@@ -66,15 +66,15 @@ def store_excel_data_in_chroma(excel_file_path, collection_name, embedmodel='nom
 
 # Main function
 def main():
-    file_path = "categorized_data.xlsx"
+    file_path = "ollamaa\categorized_data.xlsx"
     collection_name = "buildragwithpython"
 
-    # Check if file exists
-    if os.path.exists(file_path):
-        print("File exists! Proceeding with data storage.")
-        store_excel_data_in_chroma(file_path, collection_name)
-    else:
-        print("File does not exist at the specified path.")
+    # # Check if file exists
+    # if os.path.exists(file_path):
+    print("File exists! Proceeding with data storage.")
+    store_excel_data_in_chroma(file_path, collection_name)
+    # else:
+    #     print("File does not exist at the specified path.")
 
 if __name__ == "__main__":
     main()
