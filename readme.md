@@ -3,7 +3,7 @@
 1. Create virtual environment with this command: `python -m venv env`
 2. Activate the environment  `.\env\Scripts\activate.ps1`
 3. Install requirements.txt  `pip install -r requirements.txt`
-4. Modify the model name according the models that you have currently it will be set to **llama3**
+4. Modify the llama model name according to the model name that you have on your pc, currently it is set to **llama3** it's in chatbot.py.
 5. Please Move your pdfs into the client_docs folder to let the script extract text from them.
 6. Make sure to run the chroma db before you run the below command, run the chroma db with this command in a different terminal.
    `chroma run --host localhost --port 8000 --path ../vectordb-stores/chromadb'`
@@ -16,7 +16,7 @@
     ```
     python run_chatbot.py
     ```
-
+//This is to ask questions from the AI bot
     OR
 12. After that run `python search.py` in the terminal
 13. Follow it up by running the `python chatbot.py`
